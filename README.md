@@ -35,6 +35,7 @@ interaction itself.
 BOAST is used by projects such as:
 
 - [Zed Attack Proxy (ZAP)](https://www.zaproxy.org/)
+- [OmniOAST (Caido Plugin)](https://github.com/hahwul/OmniOAST)
 
 ## Documentation
 
