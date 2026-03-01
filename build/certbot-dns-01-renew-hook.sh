@@ -7,7 +7,7 @@
 # run frequently (e.g. as a cron job) without unnecessarily stopping BOAST.
 #
 # Doc on how to use this with the provided Dockerfile and more:
-# https://github.com/marcohextor/boast/blob/master/docs/deploying.md#deploying-with-docker
+# https://github.com/marcohextor/boast/blob/master/docs/deploying.md
 #
 if [ -z "$RENEWED_LINEAGE"  ]
 then
@@ -15,9 +15,16 @@ then
 	exit -1
 fi
 
-_docker_boast_img="boastimg"
-_docker_boast_container="boastmain"
-_docker_boast_dns_container="boastdns"
+if [ -n "${CONTAINER_ENGINE:-}" ]; then
+	_engine="$CONTAINER_ENGINE"
+elif command -v podman &>/dev/null; then
+	_engine="podman"
+else
+	_engine="docker"
+fi
+_boast_img="boast"
+_boast_container="boast"
+_boast_dns_container="boast-dns"
 _tls_certificate="${RENEWED_LINEAGE}/fullchain.pem"
 _tls_privkey="${RENEWED_LINEAGE}/privkey.pem"
 _boast_tls="$HOME/boast/tls"  # <- Change this if necessary
@@ -25,15 +32,15 @@ _boast_tls="$HOME/boast/tls"  # <- Change this if necessary
 # Ignoring errors with `|| true` in case containers are not running or do not exist.
 
 # Make sure everything is stopped.
-docker stop ${_docker_boast_container} || true
-docker stop ${_docker_boast_dns_container} || true
+${_engine} stop ${_boast_container} || true
+${_engine} stop ${_boast_dns_container} || true
 
 # Make sure the BOAST container does not exist.
-docker container rm ${_docker_boast_container} || true
+${_engine} container rm ${_boast_container} || true
 
 # Copy TLS files to BOAST's TLS directory.
 mkdir -p ${_boast_tls}
 cp ${_tls_certificate} ${_tls_privkey} ${_boast_tls}
 
 # Run the BOAST's main container.
-docker run -d --name ${_docker_boast_container} -p 53:53/udp -p 80:80 -p 443:443 -p 2096:2096 -p 8080:8080 -p 8443:8443 -v ${_boast_tls}:/go/src/github.com/marcohextor/BOAST/tls ${_docker_boast_img}
+${_engine} run -d --name ${_boast_container} --restart=unless-stopped -p 53:53/udp -p 80:80 -p 443:443 -p 2096:2096 -p 8080:8080 -p 8443:8443 -v ${_boast_tls}:/app/tls ${_boast_img}

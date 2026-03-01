@@ -1,8 +1,8 @@
-# BOAST's production configuration to be used with the provided Dockerfile.
-# You want to give special attention to the commented parameters.
+# Reference configuration template.
+# deploy.sh generates the actual boast.toml at the project root from .env values.
+# Edit this file only if you need to customise the template itself.
 #
-# Doc on how to use this with the provided Dockerfile (and more):
-# https://github.com/marcohextor/boast/blob/master/docs/deploying.md#deploying-with-docker
+# Doc: https://github.com/marcohextor/boast/blob/master/docs/boast-configuration.md
 #
 [storage]
   # max_events = 1_000_000

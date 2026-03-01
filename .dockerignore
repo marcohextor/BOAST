@@ -1,0 +1,14 @@
+.git
+.env
+.env.example
+.gitignore
+.dockerignore
+tls/
+docs/
+examples/
+testdata/
+LICENSE
+NOTICE
+README.md
+CLAUDE.md
+cov.out

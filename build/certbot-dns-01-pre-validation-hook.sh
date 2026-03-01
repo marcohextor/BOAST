@@ -7,7 +7,7 @@
 # run frequently (e.g. as a cron job) without unnecessarily stopping BOAST.
 #
 # Doc on how to use this with the provided Dockerfile (and more):
-# https://github.com/marcohextor/boast/blob/master/docs/deploying.md#deploying-with-docker
+# https://github.com/marcohextor/boast/blob/master/docs/deploying.md
 #
 if [ -z "$CERTBOT_VALIDATION"  ]
 then
@@ -15,19 +15,25 @@ then
 	exit -1
 fi
 
-_docker_boast_img="boastimg"
-_docker_boast_container="boastmain"
-_docker_boast_dns_container="boastdns"
-_docker_boast_bin="/go/src/github.com/marcohextor/BOAST/boast"
+if [ -n "${CONTAINER_ENGINE:-}" ]; then
+	_engine="$CONTAINER_ENGINE"
+elif command -v podman &>/dev/null; then
+	_engine="podman"
+else
+	_engine="docker"
+fi
+_boast_img="boast"
+_boast_container="boast"
+_boast_dns_container="boast-dns"
 
 # Ignoring errors with `|| true` in case containers are not running or do not exist.
 
 # Make sure everything is stopped
-docker stop ${_docker_boast_container} || true
-docker stop ${_docker_boast_dns_container} || true
+${_engine} stop ${_boast_container} || true
+${_engine} stop ${_boast_dns_container} || true
 
 # Make sure the BOAST's DNS temporary container does not exist.
-docker container rm ${_docker_boast_dns_container} || true
+${_engine} container rm ${_boast_dns_container} || true
 
 # Run the DNS receiver with the challenge's TXT record.
-docker run -d --name ${_docker_boast_dns_container} -p 53:53/udp ${_docker_boast_img} ${_docker_boast_bin} -dns_only -dns_txt ${CERTBOT_VALIDATION}
+${_engine} run -d --name ${_boast_dns_container} -p 53:53/udp ${_boast_img} ./boast -dns_only -dns_txt ${CERTBOT_VALIDATION}

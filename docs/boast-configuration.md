@@ -1,5 +1,7 @@
 # BOAST configuration
 
+`deploy.sh` generates `boast.toml` at the project root from `.env` values. The file `build/boast.toml` serves as the reference template.
+
 ## Flags
 
 * `-config` | _(string)_ | TOML configuration file (default "boast.toml")

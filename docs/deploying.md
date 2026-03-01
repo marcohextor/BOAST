@@ -1,213 +1,156 @@
 # Deploying
 
-## Makefile
+## Quick start (Cloudflare)
 
-The Makefile can be found
-[here](https://github.com/marcohextor/boast/blob/master/Makefile) and, together with the
-Go module files, should make it very easy to build BOAST by yourself. You most likely
-want to issue `make` for building and `make test` for running the package's tests.
-
-## BOAST configuration
-
-The server's configuration file is described on
-[boast-configuration.md](https://github.com/marcohextor/boast/blob/master/docs/boast-configuration.md)
-and example configurations can be found in the [config examples
-directory](https://github.com/marcohextor/boast/tree/master/examples/config).
-
-## Log level
-
-The default log level is INFO (1) which must not disclose any details about the
-reactions events. The log level can be changed to DEBUG (0) passing the `-log_level=0`
-flag to the binary. I may implement this flag with their mnemonics instead of numbers
-soon to make it more obvious, but this will always be a flag and never a parameter in
-the configuration file or any other somewhat implicit way. The reason for this is that
-avoiding the mistake of unintentionally logging possibly sensitive testing information
-is paramount.
-
-## Deploying with Docker
-
-A Dockerfile, a BOAST configuration file (`boast.toml`), and `certbot` pre validation
-and renew hooks can all be found [in the build
-directory](https://github.com/marcohextor/boast/tree/master/build). They are meant to
-work together and you must edit some parameters in the `boast.toml` file. Additionally,
-you may need to edit other files if you want a different setup.
-
-Also note that the steps listed below may be followed with a variety of divergences
-depending on your on preferences that will not be exhaustively detailed on this part of
-the document since this aims to be a simple tutorial. In general, this only means that
-some pieces like the exact DNS records may be configured in slightly different ways and
-still be valid (or not even be used at all for less functionality), but the overall
-process should remain very similar for any case.
-
-This tutorial assumes you have cloned the repository and is at the project's root
-directory.
+This path assumes you have a domain dedicated to BOAST, managed through Cloudflare.
 
 ### 1. DNS configuration
 
-For full functionality, BOAST runs its own DNS server to respond and record queries
-about the domain used for the protocol receivers. Thus, you have to dedicate an internal
-or external domain or subdomain for this use. If your domain is `example.com`, you DNS
-configuration should look something like this:
+At your **domain registrar** (not Cloudflare), set the domain's nameservers to point to your BOAST server by creating glue records:
+
+```
+ns1.example.com  ->  YOUR_SERVER_IP
+ns2.example.com  ->  YOUR_SERVER_IP
+```
+
+And NS records:
 
 ```
 example.com.      IN      NS      ns1.example.com.
 example.com.      IN      NS      ns2.example.com.
 ```
 
-You also need to configure the glue-records for the NS domains. As these depend on how
-your domain registrar exposes them on their interface, you should search their
-documentation or contact support for more details.
+This delegates all DNS for the domain to BOAST. Cloudflare is not in the DNS or HTTP path for this domain.
 
-### 2. Edit `boast.toml`
+### 2. TLS certificate
 
-If you change any of the uncommented parameters, you may have to change one or more
-parts of the remaining steps. For now, you only have to be careful about the ports as
-this will change the port parameters for the `docker run` command.
-
-Using the `boast.toml`, these are the values you need to uncomment and possibly change:
-
-* `storage` section: `max_events`, `max_events_by_test`, `max_dump_size`, `hmac_key`.
-* `storage.expire` subsection: `ttl`, `check_interval`, `max_restarts`. 
-* `dns_receiver` section: `domain`, `public_ip`.
-
-The other commented parameters are optional and may be changed at will.
-
-For more details, have a look [at the configuration
-section](https://github.com/marcohextor/boast/blob/master/docs/boast-configuration.md).
-
-### 3. Build the docker image and run BOAST with the `-dns_only` flag
+Generate a Cloudflare Origin Certificate (SSL/TLS > Origin Server > Create Certificate) for `*.example.com` and `example.com`. Save the files:
 
 ```
-$ docker build . -t boastimg -f build/Dockerfile
-$ docker run -d --name boastdns -p 53:53/udp boastimg /go/src/github.com/marcohextor/BOAST/boast -dns_only
+mkdir -p tls
+# Save certificate as tls/fullchain.pem
+# Save private key as tls/privkey.pem
 ```
 
-This will build the BOAST's Docker image and run it in a container named `boastdns` with
-the option flag `-dns_only`. As this option will only be used for the ACME DNS-01
-challenge, there's no need to put this in the Dockerfile directly.
+Note: Cloudflare Origin Certificates are signed by Cloudflare's CA, which is not publicly trusted. This is fine for BOAST's use case -- interaction clients don't validate certificates, and you can use `curl -k` for the API.
 
-Having the DNS server running before the Let's Encrypt ACME DNS-01 challenge is
-necessary or else it fails. The `-dns_only` flag is used so only the DNS receiver and
-its dependencies are run and you don't have to worry about the TLS files not being in
-place yet or anything else. Make sure the DNS receiver is configured to at least listen
-on port 53 as this will be used for the ACME challenge as expected.
-
-### 4. Wildcard TLS certificate
-
-As BOAST will freely and dynamically use subdomains for its operations, it needs an
-wildcard TLS certificate for the configured domain. You need to perform some variation
-of this step even if you choose to not use the HTTPS receiver (by not configuring its
-TLS ports) as the API only supports HTTPS. Of course, the certificate can be self-signed
-or acquired by other means. The only requirement is that the TLS files must be PEM
-encoded as [documented here](https://golang.org/pkg/crypto/tls/#LoadX509KeyPair).
-
-To perform a Let's Encrypt ACME DNS-01 challenge to acquire a wildcard certificate, you
-need [`certbot`](https://github.com/certbot/certbot) and a little help from BOAST to
-respond to the challenge. Assuming the domain is `example.com` and the hook script has
-execute permission, you may use this command:
+### 3. Configure
 
 ```
-$ certbot certonly --agree-tos --manual --preferred-challenges=dns -d *.example.com -d example.com --manual-auth-hook ./build/certbot-dns-01-pre-hook.sh
+cp .env.example .env
 ```
 
-This command will attempt a wildcard certificate issuance from Let's Encrypt using the
-provided script as a pre-validation hook.
+Edit `.env` and set `DOMAIN` and `PUBLIC_IP`. Review the other values -- `HMAC_KEY` and `STATUS_URL_PATH` are auto-generated if unset, but you should persist them in `.env` after the first deploy.
 
-An ACME DNS-01 challenge will be initiated and the validation string will be available
-to the pre-validation hook script as `$CERTBOT_VALIDATION`. Any container named
-`boastdns` or `boast` will be stopped and a new `-dns_only` BOAST container will be run
-using the flag `-dns_txt` with the validation string as value. As the DNS receiver
-responds the same TXT record for any subdomain, this will make sure that Let's Encrypt
-will find the validation TXT record for the `_acme_challenge` subdomain with a record
-similar to this:
+### 4. Deploy
 
 ```
-_acme-challenge.example.com.     300     IN      TXT     "SIbmWivQZsP9RyoEb4KFjNYPywSU-YsDUlPtWc1xDWg"
+./deploy.sh
 ```
 
-If everything worked correctly and the validation was successful, the script output will
-let you know with a congratulations message and information about your certificate files.
+This validates your config and TLS files, builds the container image, generates `boast.toml`, and starts BOAST with automatic restart on reboot.
 
-Now, copy the certificate files to a directory for this use so it can be reliably used
-to mount a volume inside the container without the other files or problems with symlinks:
+### 5. Verify
 
 ```
-$ cp /etc/letsencrypt/live/example.com/fullchain.pem ./tls
-$ cp /etc/letsencrypt/live/example.com/privkey.pem ./tls
+curl -k https://example.com:2096/
+dig @example.com example.com A
+curl http://example.com/
 ```
 
-### 5. Run
+## Non-Cloudflare deployment (Let's Encrypt)
 
-The only thing you need to do now is run a container with the exposed ports and a volume
-containing the TLS files at the right container's path:
+This path uses certbot's DNS-01 challenge. BOAST's DNS receiver handles the ACME challenge.
 
-```
-$ docker run -d --name boastmain -p 53:53/udp -p 80:80 -p 443:443 -p 2096:2096 -p 8080:8080 -p 8443:8443 \
-		-v $PWD/tls:/go/src/github.com/marcohextor/BOAST/tls boastimg 
-```
+### 1. DNS and initial setup
 
-And you can [start using it](https://github.com/marcohextor/boast/blob/master/docs/interacting.md).
+Follow step 1 above (DNS configuration), then configure `.env` (step 3 above).
 
-### 6. Automate the certificate renewal
-
-This part of the documentation will be improved for better reproducibility, but, for
-now, the renew hook script may need some editing to work on your end.  Make sure to test
-it before delegating it to a `certbot` cron job.
-
-For automating the certificate renewal process, you can use the `cerbot` pre validation
-and renew hooks found in [the build
-directory](https://github.com/marcohextor/boast/tree/master/build). You just have to put
-them in the right hook directories to be run by `certbot` when renewing or by using the
-flags `--manual-auth-hook` and `--renew-hook` to run the hooks non-interactively like
-this:
+Build the image and generate the config (without starting the server):
 
 ```
-certbot certonly -n --agree-tos --manual-public-ip-logging-ok --manual --preferred-challenges=dns -d *.example.com  \
-		 --manual-auth-hook $HOME/boast/build/certbot-dns-01-pre-validation-hook.sh \
-		 --renew-hook $HOME/boast/build/certbot-dns-01-renew-hook.sh
+./deploy.sh build
 ```
 
-Using the hook directories is recommended, but, when using the flags, make sure the
-paths to the hooks are right.
+### 2. Initial certificate issuance
 
-In both cases, you just have to run the `certbot` command from a cron job with your
-preferences and these two hooks. The hooks will only be run if a renewal is due so, with
-attention to [Let's Encrypt's rate limits](https://letsencrypt.org/docs/rate-limits/),
-it's safe to run the cron job routinely for automatic certification renewal and server
-restart with the new certificate.
+Run BOAST in DNS-only mode to handle the ACME challenge:
 
-To make customization easier, here's the minimum operations the pre validation and renew
-hooks or alternatives should do:
+```
+podman run -d --name boast-dns -p 53:53/udp boast ./boast -dns_only
+```
 
-**Pre validation hook:**
+Run certbot with the pre-validation hook:
 
-1. Stop any conflicting BOAST containers or restart it without binding it to port 53.
+```
+certbot certonly --agree-tos --manual --preferred-challenges=dns \
+    -d '*.example.com' -d example.com \
+    --manual-auth-hook ./build/certbot-dns-01-pre-validation-hook.sh
+```
 
-2. Start a DNS-only BOAST container with the right validation TXT record.
+Stop the DNS-only container and copy the issued certificates:
 
-**Renew hook:**
+```
+podman stop boast-dns && podman rm boast-dns
+mkdir -p tls
+cp /etc/letsencrypt/live/example.com/fullchain.pem tls/
+cp /etc/letsencrypt/live/example.com/privkey.pem tls/
+```
 
-1. Stop any conflicting BOAST containers.
+Now deploy the full server:
 
-2. Start the main BOAST container with the new certificates accessible to BOAST.
+```
+./deploy.sh
+```
 
-### Using a different domain for the API
+### 3. Certificate renewal
 
-One possibility not yet covered by this document is to configure the API's `domain`
-parameter in the [configuration
-file](https://github.com/marcohextor/boast/edit/master/docs/boast-configuration.md).
-Doing this will allow you to protect the API with a proxy or what else may need a domain
-not dedicated to BOAST's DNS receiver. It will not be possible to perform the ACME
-DNS-01 challenge using the BOAST's DNS receiver as a helper and you'll need to configure
-the API's TLS file paths, but you may issue a self-signed certificate for the API only
-(hence without the ACME challenge) if that fits your requiremets.
+Automate renewal with a cron job using both hook scripts:
 
-### Possible improvements
+```
+certbot certonly -n --agree-tos --manual-public-ip-logging-ok --manual \
+    --preferred-challenges=dns -d '*.example.com' \
+    --manual-auth-hook /path/to/build/certbot-dns-01-pre-validation-hook.sh \
+    --renew-hook /path/to/build/certbot-dns-01-renew-hook.sh
+```
 
-1. This can be made more automated and reproducible by pushing the whole ACME DNS-01
-   challenge validation to Docker with `certbot` (or alternative) included. This way,
-   the challenge container can be orchestated to perform the whole challenge process
-   without host dependencies and save certificates to a volume to be shared with the
-   main BOAST container. But I'm yet to document it :).
+The hooks handle stopping, certificate copying, and restarting BOAST automatically. They only run when renewal is actually due.
 
-2. Automate most of the process with an installation script.
+## Local development
+
+```
+./deploy.sh dev
+```
+
+Uses high ports (8053, 8080, 8443, 2096), test certificates from `testdata/`, and no restart policy. Verify with:
+
+```
+curl -k https://localhost:2096/
+curl http://localhost:8080/
+dig @localhost -p 8053 localhost A
+```
+
+## Stopping
+
+```
+./deploy.sh stop
+```
+
+## Rebuilding without tests
+
+```
+./deploy.sh --no-test
+./deploy.sh dev --no-test
+```
+
+## Notes
+
+- **`--restart=unless-stopped`**: Production containers restart on reboot and on crash, but stay stopped after `./deploy.sh stop`. This is deliberate.
+- **`HMAC_KEY` persistence**: If not set in `.env`, `deploy.sh` auto-generates one. Add the printed value to `.env` or existing test IDs will be invalidated on redeployment.
+- **`STATUS_URL_PATH` persistence**: Same as `HMAC_KEY` -- auto-generated if unset, but persist it or you lose access to the status page.
+- **Container engine**: Defaults to `podman`, falls back to `docker`. Override with `CONTAINER_ENGINE` in `.env` or environment.
+- **`REAL_IP_HEADER`**: Only set this if BOAST is behind a reverse proxy (e.g. `CF-Connecting-IP` for Cloudflare, `X-Real-IP` for nginx). If unset, BOAST records the direct connection IP.
+
+## Configuration reference
+
+See [boast-configuration.md](boast-configuration.md) for the full configuration file reference and command-line flags.
