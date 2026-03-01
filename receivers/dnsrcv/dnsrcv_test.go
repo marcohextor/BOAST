@@ -1,7 +1,7 @@
 package dnsrcv_test
 
 import (
-	"io/ioutil"
+	"io"
 	"os"
 	"reflect"
 	"testing"
@@ -15,7 +15,7 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	log.SetOutput(ioutil.Discard)
+	log.SetOutput(io.Discard)
 	os.Exit(m.Run())
 }
 

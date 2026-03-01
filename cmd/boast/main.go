@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 
 	"github.com/marcohextor/BOAST/api"
@@ -64,7 +63,7 @@ func init() {
 func main() {
 	log.Info("Starting %s", prognver)
 
-	tomlData, err := ioutil.ReadFile(cfgPath)
+	tomlData, err := os.ReadFile(cfgPath)
 	if err != nil {
 		log.Fatalln("Failed to read configuration:", err)
 	}

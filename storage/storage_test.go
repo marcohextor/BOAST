@@ -2,8 +2,7 @@ package storage_test
 
 import (
 	"container/heap"
-	"io/ioutil"
-
+	"io"
 	"math/rand"
 	"os"
 	"reflect"
@@ -29,7 +28,7 @@ func newTestEnv() *testEnv {
 }
 
 func TestMain(m *testing.M) {
-	log.SetOutput(ioutil.Discard)
+	log.SetOutput(io.Discard)
 	os.Exit(m.Run())
 }
 
@@ -113,7 +112,6 @@ func TestCreateSameTestMultipleTimes(t *testing.T) {
 	wantID := storage.TTest.ID()
 	wantCanary := storage.TTest.Canary()
 	wantTotal := 1
-	rand.Seed(time.Now().UnixNano())
 	for i := 0; i < rand.Intn(env.strg.MaxTests()); i++ {
 		gotID, gotCanary, err := env.strg.SetTest(storage.TTest.Secret)
 
@@ -140,7 +138,6 @@ func TestCreateSameTestMultipleTimes(t *testing.T) {
 func TestCreateDifferengTests(t *testing.T) {
 	env := newTestEnv()
 
-	rand.Seed(time.Now().UnixNano())
 	wantTotal := rand.Intn(env.strg.MaxTests())
 
 	for i := 0; i < wantTotal; i++ {
@@ -202,7 +199,6 @@ func TestSearchTest(t *testing.T) {
 
 	env.strg.SetTest(storage.TTest.Secret)
 
-	rand.Seed(time.Now().UnixNano())
 	for i := 0; i < rand.Intn(11); i++ {
 		env.strg.SetTest(storage.RandBytes(8))
 	}

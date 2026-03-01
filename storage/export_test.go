@@ -125,7 +125,6 @@ func NewEmptyEventsHeap() *ExportEventHeap {
 }
 
 func RandBytes(l int) []byte {
-	rand.Seed(time.Now().UnixNano())
 	b := make([]byte, l)
 	for i := range b {
 		b[i] = byte(rand.Intn(255))

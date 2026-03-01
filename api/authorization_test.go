@@ -6,20 +6,19 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/marcohextor/BOAST/api"
 	"github.com/marcohextor/BOAST/log"
 )
 
 func TestMain(m *testing.M) {
-	log.SetOutput(ioutil.Discard)
+	log.SetOutput(io.Discard)
 	os.Exit(m.Run())
 }
 
@@ -178,7 +177,7 @@ func checkEventsBody(buf *bytes.Buffer, wantID string, wantEventsLen int, t *tes
 }
 
 func unmarshalEventsResponse(buf *bytes.Buffer) (res mockEventsResponse, err error) {
-	b, err := ioutil.ReadAll(buf)
+	b, err := io.ReadAll(buf)
 	if err != nil {
 		return res, err
 	}
@@ -189,7 +188,6 @@ func unmarshalEventsResponse(buf *bytes.Buffer) (res mockEventsResponse, err err
 }
 
 func randBytes(l int) []byte {
-	rand.Seed(time.Now().UnixNano())
 	b := make([]byte, l)
 	for i := range b {
 		b[i] = byte(rand.Intn(255))
