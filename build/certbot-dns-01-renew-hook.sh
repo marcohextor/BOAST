@@ -9,11 +9,15 @@
 # Doc on how to use this with the provided Dockerfile and more:
 # https://github.com/marcohextor/boast/blob/master/docs/deploying.md
 #
-if [ -z "$RENEWED_LINEAGE"  ]
-then
+set -euo pipefail
+
+if [ -z "${RENEWED_LINEAGE:-}" ]; then
 	echo "error: renewed lineage is empty"
-	exit -1
+	exit 1
 fi
+
+# Clean up accumulated TXT values from pre-validation hook.
+rm -f /tmp/boast-acme-txt-values
 
 if [ -n "${CONTAINER_ENGINE:-}" ]; then
 	_engine="$CONTAINER_ENGINE"
@@ -27,7 +31,8 @@ _boast_container="boast"
 _boast_dns_container="boast-dns"
 _tls_certificate="${RENEWED_LINEAGE}/fullchain.pem"
 _tls_privkey="${RENEWED_LINEAGE}/privkey.pem"
-_boast_tls="$HOME/boast/tls"  # <- Change this if necessary
+_script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_boast_tls="$(dirname "$_script_dir")/tls"
 
 # Ignoring errors with `|| true` in case containers are not running or do not exist.
 

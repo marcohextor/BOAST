@@ -1,6 +1,7 @@
 .git
 .env
 .env.example
+boast.toml
 .gitignore
 .dockerignore
 tls/

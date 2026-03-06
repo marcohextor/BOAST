@@ -171,10 +171,12 @@ func (d *dnsHandler) setDNSAnswer(msg, r *dns.Msg) {
 		if len(d.txt) > 0 {
 			if qType == dns.TypeTXT || qType == dns.TypeANY {
 				hdr.Rrtype = dns.TypeTXT
-				msg.Answer = append(msg.Answer, &dns.TXT{
-					Hdr: hdr,
-					Txt: d.txt,
-				})
+				for _, t := range d.txt {
+					msg.Answer = append(msg.Answer, &dns.TXT{
+						Hdr: hdr,
+						Txt: []string{t},
+					})
+				}
 			}
 		}
 	}

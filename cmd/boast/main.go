@@ -16,8 +16,17 @@ import (
 )
 
 const program = "BOAST"
-const version = "v1.0.0"
+const version = "v1.2.0"
 const author = "Marco Hextor (marcohextor)"
+
+// stringSlice implements flag.Value for repeatable string flags.
+type stringSlice []string
+
+func (s *stringSlice) String() string { return fmt.Sprintf("%v", *s) }
+func (s *stringSlice) Set(v string) error {
+	*s = append(*s, v)
+	return nil
+}
 
 var (
 	prognver = fmt.Sprintf("%s %s", program, version)
@@ -26,7 +35,7 @@ var (
 	logLevel int
 	logPath  string
 	dnsOnly  bool
-	dnsTxt   string
+	dnsTxt   stringSlice
 	showVer  bool
 )
 
@@ -41,7 +50,7 @@ func init() {
 	flag.IntVar(&logLevel, "log_level", 1, "Set the logging level (0=DEBUG|1=INFO)")
 	flag.StringVar(&logPath, "log_file", "", "Path to log file")
 	flag.BoolVar(&dnsOnly, "dns_only", false, "Run only the DNS receiver and its dependencies")
-	flag.StringVar(&dnsTxt, "dns_txt", "", "DNS receiver's TXT record")
+	flag.Var(&dnsTxt, "dns_txt", "DNS TXT record value (repeatable)")
 	flag.BoolVar(&showVer, "v", false, "Print program version and quit")
 	flag.Parse()
 
@@ -107,8 +116,8 @@ func main() {
 	}
 
 	txt := cfg.DNSRcv.Txt
-	if dnsTxt != "" {
-		txt = append(txt, dnsTxt)
+	if len(dnsTxt) > 0 {
+		txt = append(txt, dnsTxt...)
 	}
 	dnsRcv := &dnsrcv.Receiver{
 		Name:     "DNS receiver",

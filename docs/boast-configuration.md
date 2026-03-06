@@ -6,7 +6,7 @@
 
 * `-config` | _(string)_ | TOML configuration file (default "boast.toml")
 * `-dns_only` | Run only the DNS receiver and its dependencies
-* `-dns_txt` | DNS receiver's TXT record
+* `-dns_txt` | DNS TXT record value (repeatable, e.g. `-dns_txt v1 -dns_txt v2`)
 * `-log_file` | _(string)_ | Path to log file
 * `-log_level` | _(int)_ | Set the logging level (0=DEBUG|1=INFO) (default 1)
 * `-v` | Print program version and quit

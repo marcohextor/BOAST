@@ -32,7 +32,7 @@ cmd_stop() {
     echo "Done."
 }
 
-# Load .env and set derived values. Used by both build and prod.
+# Load .env and set derived values. Used by config, build, and prod.
 load_env() {
     if [ ! -f .env ]; then
         echo "error: .env file not found. Copy .env.example to .env and configure it." >&2
@@ -64,7 +64,8 @@ load_env() {
     fi
 }
 
-generate_toml_prod() {
+cmd_config() {
+    load_env
     local real_ip_line=""
     if [ -n "${REAL_IP_HEADER:-}" ]; then
         real_ip_line=$'\n  real_ip_header = "'"${REAL_IP_HEADER}"'"'
@@ -110,7 +111,7 @@ TOML
 }
 
 generate_toml_dev() {
-    cat > boast.toml <<'TOML'
+    cat > boast.dev.toml <<'TOML'
 [storage]
   max_events = 1_000_000
   max_events_by_test = 100
@@ -143,7 +144,14 @@ generate_toml_dev() {
   domain = "localhost"
   public_ip = "127.0.0.1"
 TOML
-    echo "Generated dev boast.toml"
+    echo "Generated dev config (boast.dev.toml)"
+}
+
+require_config() {
+    if [ ! -f boast.toml ]; then
+        echo "error: boast.toml not found. Run './deploy.sh config' to generate it." >&2
+        exit 1
+    fi
 }
 
 do_build() {
@@ -160,16 +168,18 @@ cmd_build() {
     local skip_test="${1:-0}"
     load_env
     local engine; engine="$(detect_engine)"
-    generate_toml_prod
+    if [ ! -f boast.toml ]; then
+        cmd_config
+    fi
     do_build "$engine" "$skip_test"
     echo ""
-    echo "Image built. Config generated. Ready for ./deploy.sh when TLS certs are in place."
+    echo "Image built. Ready for ./deploy.sh when TLS certs are in place."
 }
 
 cmd_dev() {
     local skip_test="${1:-0}"
     local engine; engine="$(detect_engine)"
-    generate_toml_dev
+    generate_toml_dev  # writes boast.dev.toml
     do_build "$engine" "$skip_test"
 
     $engine stop boast 2>/dev/null || true
@@ -181,6 +191,7 @@ cmd_dev() {
         -p 8080:8080 \
         -p 8443:8443 \
         -p 2096:2096 \
+        -v "$PWD/boast.dev.toml:/app/boast.toml:ro" \
         -v "$PWD/testdata:/app/tls:ro" \
         boast
 
@@ -196,6 +207,8 @@ cmd_prod() {
     load_env
     local engine; engine="$(detect_engine)"
 
+    require_config
+
     if [ ! -d tls ] || [ ! -f tls/fullchain.pem ] || [ ! -f tls/privkey.pem ]; then
         echo "error: TLS certificates not found. Expected tls/fullchain.pem and tls/privkey.pem" >&2
         echo "See docs/deploying.md for certificate setup." >&2
@@ -203,7 +216,6 @@ cmd_prod() {
         exit 1
     fi
 
-    generate_toml_prod
     do_build "$engine" "$skip_test"
 
     $engine stop boast 2>/dev/null || true
@@ -218,6 +230,7 @@ cmd_prod() {
         -p 2096:2096 \
         -p 8080:8080 \
         -p 8443:8443 \
+        -v "$PWD/boast.toml:/app/boast.toml:ro" \
         -v "$PWD/tls:/app/tls:ro" \
         boast
 
@@ -238,17 +251,19 @@ for arg in "$@"; do
         dev)    MODE="dev" ;;
         stop)   MODE="stop" ;;
         build)  MODE="build" ;;
+        config) MODE="config" ;;
         --no-test) SKIP_TEST=1 ;;
         *)
-            echo "Usage: $0 [dev|stop|build] [--no-test]" >&2
+            echo "Usage: $0 [dev|stop|build|config] [--no-test]" >&2
             exit 1
             ;;
     esac
 done
 
 case "${MODE:-prod}" in
-    dev)   cmd_dev "$SKIP_TEST" ;;
-    stop)  cmd_stop ;;
-    build) cmd_build "$SKIP_TEST" ;;
-    prod)  cmd_prod "$SKIP_TEST" ;;
+    dev)    cmd_dev "$SKIP_TEST" ;;
+    stop)   cmd_stop ;;
+    build)  cmd_build "$SKIP_TEST" ;;
+    config) cmd_config ;;
+    prod)   cmd_prod "$SKIP_TEST" ;;
 esac

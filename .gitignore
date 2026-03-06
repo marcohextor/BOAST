@@ -1,5 +1,6 @@
 .env
 boast.toml
-boast
+boast.dev.toml
+/boast
 cov.out
 tls/
