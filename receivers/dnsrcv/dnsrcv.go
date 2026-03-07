@@ -72,6 +72,9 @@ var queryTypeNames = map[uint16]string{
 // ServeDNS is the handler for BOAST's DNS queries.
 // It responds to A, NS, SOA, and MX queries always pointing to the same IP.
 func (d *dnsHandler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
+	if len(r.Question) == 0 {
+		return
+	}
 	log.Info("DNS event received")
 	msg := dns.Msg{}
 	msg.SetReply(r)

@@ -261,3 +261,12 @@ func TestDNSResponseANY(t *testing.T) {
 		}
 	}
 }
+
+func TestDNSEmptyQuestion(t *testing.T) {
+	handler := NewTestHandler()
+	qr := &testWriter{}
+	handler.ServeDNS(qr, &dns.Msg{})
+	if qr.Msg != nil {
+		t.Fatal("expected no response for empty question")
+	}
+}
