@@ -2,6 +2,7 @@ package dnsrcv_test
 
 import (
 	"io"
+	"net"
 	"os"
 	"reflect"
 	"testing"
@@ -9,10 +10,21 @@ import (
 	"github.com/marcohextor/BOAST/log"
 	"github.com/marcohextor/BOAST/receivers/dnsrcv"
 
-	"github.com/coredns/coredns/plugin/pkg/dnstest"
-	"github.com/coredns/coredns/plugin/test"
 	"github.com/miekg/dns"
 )
+
+type testWriter struct {
+	Msg *dns.Msg
+}
+
+func (w *testWriter) LocalAddr() net.Addr  { return &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 53} }
+func (w *testWriter) RemoteAddr() net.Addr { return &net.UDPAddr{IP: net.IPv4(10, 0, 0, 1), Port: 1234} }
+func (w *testWriter) WriteMsg(msg *dns.Msg) error { w.Msg = msg; return nil }
+func (w *testWriter) Write([]byte) (int, error)   { return 0, nil }
+func (w *testWriter) Close() error                 { return nil }
+func (w *testWriter) TsigStatus() error            { return nil }
+func (w *testWriter) TsigTimersOnly(bool)          {}
+func (w *testWriter) Hijack()                      {}
 
 func TestMain(m *testing.M) {
 	log.SetOutput(io.Discard)
@@ -30,7 +42,7 @@ func TestDNSResponseA(t *testing.T) {
 	handler := NewTestHandler()
 
 	for _, n := range []string{"example.com.", "sub.example.com."} {
-		qr := dnstest.NewRecorder(&test.ResponseWriter{})
+		qr := &testWriter{}
 		dnsMsg := &dns.Msg{}
 		dnsMsg.SetQuestion(n, dns.TypeA)
 
@@ -59,7 +71,7 @@ func TestDNSResponseNS(t *testing.T) {
 	handler := NewTestHandler()
 
 	for _, n := range []string{"example.com.", "sub.example.com."} {
-		qr := dnstest.NewRecorder(&test.ResponseWriter{})
+		qr := &testWriter{}
 		dnsMsg := &dns.Msg{}
 		dnsMsg.SetQuestion(n, dns.TypeNS)
 
@@ -99,7 +111,7 @@ func TestDNSResponseSOA(t *testing.T) {
 	handler := NewTestHandler()
 
 	for _, n := range []string{"example.com.", "sub.example.com."} {
-		qr := dnstest.NewRecorder(&test.ResponseWriter{})
+		qr := &testWriter{}
 		dnsMsg := &dns.Msg{}
 		dnsMsg.SetQuestion(n, dns.TypeSOA)
 
@@ -134,7 +146,7 @@ func TestDNSResponseMX(t *testing.T) {
 	handler := NewTestHandler()
 
 	for _, n := range []string{"example.com.", "sub.example.com."} {
-		qr := dnstest.NewRecorder(&test.ResponseWriter{})
+		qr := &testWriter{}
 		dnsMsg := &dns.Msg{}
 		dnsMsg.SetQuestion(n, dns.TypeMX)
 
@@ -164,7 +176,7 @@ func TestDNSResponseTXT(t *testing.T) {
 	handler := NewTestHandler()
 
 	for _, n := range []string{"example.com.", "sub.example.com."} {
-		qr := dnstest.NewRecorder(&test.ResponseWriter{})
+		qr := &testWriter{}
 		dnsMsg := &dns.Msg{}
 		dnsMsg.SetQuestion(n, dns.TypeTXT)
 
@@ -194,7 +206,7 @@ func TestDNSResponseANY(t *testing.T) {
 	handler := NewTestHandler()
 
 	for _, n := range []string{"example.com.", "sub.example.com."} {
-		qr := dnstest.NewRecorder(&test.ResponseWriter{})
+		qr := &testWriter{}
 		dnsMsg := &dns.Msg{}
 		dnsMsg.SetQuestion(n, dns.TypeANY)
 
