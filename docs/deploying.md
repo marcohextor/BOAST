@@ -148,6 +148,18 @@ To regenerate `boast.toml` from `.env` (resets any manual edits):
 ./deploy.sh config
 ```
 
+## Securing the API
+
+BOAST does not implement application-level access control on the API. The `Authorization: Secret` header is used for test identification (HMAC-based), not client authentication -- any host that can reach port 2096 can create tests and poll events. Receiver ports (53, 80, 443, 8080, 8443) are intentionally public. The API port should be restricted to trusted hosts using operator-level controls (firewall, reverse proxy, VPN, or private network).
+
+The simplest approach is a host firewall rule. For example, with UFW:
+
+```
+sudo ufw allow from 203.0.113.10 to any port 2096 proto tcp
+```
+
+This allows only `203.0.113.10` to reach the API. All other sources are blocked by the default-deny policy.
+
 ## Notes
 
 - **`--restart=unless-stopped`**: Production containers restart on reboot and on crash, but stay stopped after `./deploy.sh stop`. This is deliberate.
